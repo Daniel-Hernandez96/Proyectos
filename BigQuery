@@ -1,0 +1,71 @@
+## Primero codigo para ver la Data NYC TLC Trips
+// SELECT COUNT(*) trips
+ from `bigquery-public-data.new_york.tlc_yellow_trips_2015`//
+
+ ## Segunda Query para ver la Data NYC TLC Trips
+ #standardSQL
+SELECT EXTRACT(DAYOFWEEK FROM pickup_datetime) DAYOFWEEK,
+  ROUND(AVG(trip_distance / TIMESTAMP_DIFF(dropoff_datetime,
+          pickup_datetime, SECOND)) * 3600, 1) speed
+FROM `bigquery-public-data.new_york.tlc_yellow_trips_2015`
+WHERE trip_distance > 0
+  AND fare_amount / trip_distance BETWEEN 2 AND 10
+  AND dropoff_datetime > pickup_datetime
+GROUP BY 1
+ORDER BY 1
+
+## Creacion de un modelo ML
+
+CREATE OR REPLACE MODEL taxi.taxifaremodel
+OPTIONS
+  (model_type='linear_reg', labels=['total_fare']) AS
+WITH params AS (
+  SELECT
+    2 AS TRAIN,
+    2 AS EVAL
+),
+daynames AS (
+  SELECT ['Sun', 'Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat'] AS daysofweek
+),
+taxitrips AS (
+  SELECT
+    (tolls_amount+fare_amount) AS total_fare,
+    daysofweek[ORDINAL(EXTRACT(DAYOFWEEK FROM pickup_datetime))] AS dayofweek,
+    EXTRACT(HOUR FROM pickup_datetime) AS hourofday,
+    pickup_longitude AS pickuplon,
+    pickup_latitude AS pickuplat,
+    dropoff_longitude AS dropofflon,
+    dropoff_latitude AS dropofflat,
+    passenger_count AS passengers
+  FROM `bigquery-public-data.new_york.tlc_yellow_trips_2015`,
+    daynames, params
+  WHERE
+    trip_distance>0 and
+    fare_amount>0
+    AND MOD(ABS(farm_fingerprint(CAST(pickup_datetime AS STRING))),1000)=params.TRAIN
+)
+SELECT *
+FROM taxitrips;
+
+
+## query para saber que variables son mas importantes
+
+SELECT *
+FROM ML.WEIGHTS(MODEL `taxi.taxifaremodel`);
+
+## query ejemplo para usar el modelo
+
+SELECT *
+FROM ML.PREDICT(MODEL `taxi.taxifaremodel`,
+  (
+    SELECT
+      "Mon" AS dayofweek,
+      14 AS hourofday,
+      -73.985 AS pickuplon,
+      40.758 AS pickuplat,
+      -73.9855 AS dropofflon,
+      40.748 AS dropofflat,
+      2 AS passengers
+  )
+);
+
