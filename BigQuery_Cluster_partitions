@@ -1,0 +1,71 @@
+##Crear las particiones 
+
+CREATE TABLE
+    `mydataset.avocados`
+AS (
+    SELECT
+        *
+    FROM `mydataset.avocado_base`
+);
+
+## crear una tabla con una partición
+
+CREATE TABLE
+    `mydataset.avocados_partitioned`
+PARTITION BY
+    RANGE_BUCKET(Year, GENERATE_ARRAY(2015,2022,1))
+AS (
+    SELECT
+        *
+    FROM `mydataset.avocado_base`
+);
+
+##crear una tabla con particion y un cluster
+
+CREATE TABLE
+    `mydataset.avocados_clustered`
+PARTITION BY
+    RANGE_BUCKET(Year, GENERATE_ARRAY(2015,2022,1))
+CLUSTER BY
+    type
+AS (
+    SELECT
+        *
+    FROM `mydataset.avocado_base`
+);
+
+## Consultar las tablas y comparar el rendimiento
+
+SELECT
+    year,
+    COUNT(*) AS number_avocados,
+    SUM(TotalVolume) AS sum_totalVolume,
+    SUM(AveragePrice) AS sum_AveragePrice
+FROM `mydataset.avocados`
+WHERE type = 'organic'
+GROUP BY year
+ORDER BY year ASC;
+
+## Consultar la tabla particionada
+
+SELECT
+    year,
+    COUNT(*) AS number_avocados,
+    SUM(TotalVolume) as sum_TotalVolume,
+    SUM(AveragePrice) as sum_AveragePrice
+FROM `mydataset.avocados_partitioned`
+WHERE type = 'organic'
+GROUP BY year
+ORDER BY year ASC;
+
+## Consultar la tabla particionada y agrupada
+
+SELECT
+    year,
+    COUNT(*) AS number_avocados,
+    SUM(TotalVolume) as sum_TotalVolume,
+    SUM(AveragePrice) as sum_AveragePrice
+FROM `mydataset.avocados_clustered`
+WHERE type = 'organic'
+GROUP BY year
+ORDER BY year ASC;
